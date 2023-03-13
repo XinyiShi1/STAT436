@@ -1,0 +1,134 @@
+---
+title: "STAT436 hw2"
+author: "Xinyi Shi"
+date: "2023-03-12"
+output: html_document
+---
+
+```{r}
+Sales <- read.csv("https://raw.githubusercontent.com/XinyiShi1/Dataset/main/Video_Games_Sales_as_at_22_Dec_2016.csv")
+Sales <- Sales[(Sales$Year_of_Release!="N/A")&(Sales$Genre!=""),]
+#head(Sales)
+```
+
+```{r}
+bubbleplot <- function(df){
+  ggplot(mapping = aes(Year_of_Release, Genre, size = Global_Sales)) +
+    geom_point(data = df %>% filter(selected), alpha = 1) +
+    #geom_point(data = df %>% filter(selected), alpha = 0.1) +
+    scale_size(range = c(.1,24), name = "Sales", guide = "none")
+}
+
+year <- pull(Sales, Year_of_Release) %>%
+  unique() %>%
+  na.omit()
+
+genre <- pull(Sales, Genre) %>%
+  unique() %>%
+  na.omit()
+
+ui <- fluidPage(
+  titlePanel("Video game Sales in Europe"),
+  fluidRow(
+    column(12, plotOutput("bubble"))
+  ),
+  selectInput("genre","Genre",genre, multiple = TRUE),
+  selectInput("year","Year",year, multiple = TRUE),
+  dataTableOutput("table")
+)
+
+server <- function(input, output){
+  salesnew <- reactive({
+    Sales %>% 
+      mutate(
+        selected = (
+          (Genre %in% input$genre) &
+            (Year_of_Release %in% input$year)
+        )
+      )
+  }) 
+  
+  output$bubble <- renderPlot({
+    bubbleplot(salesnew())
+  })
+  
+  output$table <- renderDataTable(salesnew)
+}
+
+shinyApp(ui, server)
+```
+
+```{r}
+Sales %>% 
+  mutate(selected = (Sales$Genre %in% c("sports","puzzle")) & (Sales$year %in% c("2006","1989"))) %>% 
+  summarise()
+Sales %>% 
+  filter(selected) %>% 
+  summarise()
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(plotly)
+library(gapminder)
+
+Data <- gapminder %>% filter(year=="2007") %>% dplyr::select(-year) %>% 
+  arrange(desc(pop)) %>% 
+  mutate(country = factor(country, country))
+
+bubbleplot <- function(df){
+  p <-  ggplot(data = df %>% filter(selected), aes(x=gdpPercap, y=lifeExp, size=pop, color=continent)) +
+    geom_point(alpha=0.5) +
+    scale_size(range = c(.1, 24), name="Population (M)")
+  ggplotly(p) %>% style(hoveron = "fill")
+}
+
+Continent <- pull(Data, continent) %>%
+   unique() %>%
+   na.omit()
+
+
+Country <- pull(Data, country) %>%
+   unique() %>%
+   na.omit()
+
+ui <- fluidPage(
+  titlePanel("GDP VS LifeExp in each country"),
+  sidebarLayout(
+    sidebarPanel(textOutput("text"), width = 2),
+    mainPanel(plotlyOutput("bubble"), width = 10)
+  ),
+  # fluidRow(
+  #   column(2,textOutput("text")),
+  #   column(10, plotlyOutput("bubble"))
+  # ),
+  fluidRow(
+    column(6,checkboxGroupInput("continent","Continent",Continent,Continent)),
+    column(6,selectInput("country","Country",Country, multiple = TRUE, selected = Country))
+  ),
+  dataTableOutput("table")
+)
+
+server <- function(input, output){
+  new <- reactive({
+    Data %>% 
+      dplyr::mutate(selected = (continent %in% input$continent)&(country %in% input$country))
+  })
+  
+  output$bubble <- renderPlotly({
+    bubbleplot(new())
+  })
+  
+  output$text <- renderText("This is a shiny app designed to show the relationship between GDP and average life expectancy across countries, which can be queried by selecting countries and continents below.")
+  output$table <- renderDataTable(new())
+}
+
+shinyApp(ui, server)
+
+
+```
+
+
