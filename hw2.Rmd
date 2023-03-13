@@ -1,0 +1,70 @@
+---
+title: "STAT436 hw2"
+author: "Xinyi Shi"
+date: "2023-03-12"
+output: html_document
+---
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(plotly)
+library(gapminder)
+
+Data <- gapminder %>% filter(year=="2007") %>% dplyr::select(-year) %>% 
+  arrange(desc(pop)) %>% 
+  mutate(country = factor(country, country))
+
+bubbleplot <- function(df){
+  p <-  ggplot(data = df %>% filter(selected), aes(x=gdpPercap, y=lifeExp, size=pop, color=continent)) +
+    geom_point(alpha=0.5) +
+    scale_size(range = c(.1, 24), name="Population (M)")
+  ggplotly(p) %>% style(hoveron = "fill")
+}
+
+Continent <- pull(Data, continent) %>%
+   unique() %>%
+   na.omit()
+
+
+Country <- pull(Data, country) %>%
+   unique() %>%
+   na.omit()
+
+ui <- fluidPage(
+  titlePanel("GDP VS LifeExp in each country"),
+  sidebarLayout(
+    sidebarPanel(textOutput("text"), width = 2),
+    mainPanel(plotlyOutput("bubble"), width = 10)
+  ),
+  # fluidRow(
+  #   column(2,textOutput("text")),
+  #   column(10, plotlyOutput("bubble"))
+  # ),
+  fluidRow(
+    column(6,checkboxGroupInput("continent","Continent",Continent,Continent)),
+    column(6,selectInput("country","Country",Country, multiple = TRUE, selected = Country))
+  ),
+  dataTableOutput("table")
+)
+
+server <- function(input, output){
+  new <- reactive({
+    Data %>% 
+      dplyr::mutate(selected = (continent %in% input$continent)&(country %in% input$country))
+  })
+  
+  output$bubble <- renderPlotly({
+    bubbleplot(new())
+  })
+  
+  output$text <- renderText("This is a shiny app designed to show the relationship between GDP and average life expectancy across countries, which can be queried by selecting countries and continents below.")
+  output$table <- renderDataTable(new())
+}
+
+shinyApp(ui, server)
+
+
+```
+
+
